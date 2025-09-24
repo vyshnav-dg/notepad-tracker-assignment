@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Textarea with File Path</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #f0f0f0;
+      font-family: sans-serif;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    textarea {
+      width: 90vw;
+      height: 70vh;
+      border: 2px solid #333;
+      padding: 10px;
+      box-sizing: border-box;
+      font-size: 16px;
+      resize: none;
+      background-color: #fff;
+      margin-top: 10px;
+    }
+
+    input[type="text"],
+    button {
+      margin-top: 10px;
+      font-size: 16px;
+      padding: 5px;
+    }
+
+    #file-status {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #555;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <input type="text" id="filePath" placeholder="Enter file path (e.g. C:/Users/Me/Desktop/file.txt)" />
+    <button id="loadFileBtn">Load File</button>
+    <div id="file-status">No file selected</div>
+    <textarea placeholder="File content will appear here..." id="txtarea"></textarea>
+  </div>
+
+  <script>
+    let textarea;
+
+    function checkTyping() {
+      let timer;
+      const timeoutVal = 2000; // ms
+      const txt = document.getElementById("txtarea");
+      const fileStatus = document.getElementById("file-status");
+
+      txt.addEventListener('keypress', () => {
+        clearTimeout(timer);
+      });
+
+      txt.addEventListener('keyup', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          console.log("Stopped typing");
+
+          const userPath = document.getElementById('filePath').value.trim();
+
+          if (userPath === "") {
+            fileStatus.textContent = "No file path entered.";
+            console.warn("No file path entered, skipping POST.");
+            return;
+          }
+
+          fetch('/file-updated', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              path: userPath,
+              content: textarea.value
+            })
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.error) {
+                fileStatus.textContent = "Error: " + data.error;
+                console.error("Server error:", data.error);
+              } else {
+                fileStatus.textContent = "File saved successfully.";
+                console.log("Server response:", data);
+              }
+            })
+            .catch(err => {
+              fileStatus.textContent = "Failed to send data to server.";
+              console.error("Error sending POST:", err);
+            });
+        }, timeoutVal);
+      });
+    }
+
+    function setup() {
+      const filePathInput = document.getElementById("filePath");
+      const loadFileBtn = document.getElementById("loadFileBtn");
+      const fileStatus = document.getElementById("file-status");
+      textarea = document.getElementById("txtarea");
+
+      loadFileBtn.addEventListener('click', () => {
+        const userPath = filePathInput.value.trim();
+        if (!userPath) {
+          alert("Please enter a file path to load.");
+          return;
+        }
+
+        fetch('/read-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: userPath })
+        })
+          .then(res => {
+            console.log(res)
+            if (!res.ok) throw new Error("Failed to read file from server");
+            return res.json();
+          })
+          .then(data => {
+            if (data.error) {
+              alert("Error: " + data.error);
+              fileStatus.textContent = "Error loading file";
+              return;
+            }
+            textarea.value = data.content || "";
+            fileStatus.textContent = "Loaded file from server: " + userPath;
+          })
+          .catch(err => {
+            alert(err.message);
+            fileStatus.textContent = "Error loading file";
+          });
+      });
+
+      checkTyping();
+    }
+
+    window.onload = setup;
+  </script>
+
+</body>
+
+</html>
